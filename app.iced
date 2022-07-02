@@ -14,7 +14,6 @@ Table = require 'ascii-table'
 ##
 client.on 'ready', =>
   log /connected/, conf.TOKEN
-  msg.channel.send "`discord_bot_connected`"
 
 ##
 client.on 'message', (msg) =>
