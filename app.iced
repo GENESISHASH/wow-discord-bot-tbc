@@ -10,6 +10,7 @@ client = new swift.Client()
 token = conf.TOKEN
 
 Table = require 'ascii-table'
+cinfo = require __dirname + '/lib/character-info'
 
 ##
 client.on 'ready', =>
@@ -19,52 +20,13 @@ client.on 'ready', =>
 client.on 'message', (msg) =>
   if msg.content.startsWith(conf.COMMAND + ' ')
     player_name = msg.content.substr(conf.COMMAND.length).trim()
-    await _.get "https://ironforge.pro/api/players?player=#{player_name}-#{conf.SERVER}", defer e,raw,r
-    return if e
 
+    # ironforge.pro lookup
+    await cinfo.ifpro player_name, defer e,result
     if e
-      return msg.channel.send "```generic_error```"
+      return msg.channel.send(e.toString())
 
-    if !r?.info?.name
-      return msg.channel.send "```character_noexists```"
-
-    ratings = []
-
-    result = {
-      name: r.info.name
-      race: r.info.race.toLowerCase()
-      class: r.info.clas?.toLowerCase?() ? undefined
-      highest: 0
-      seasonal: (do =>
-        tmp = {}
-        for season in [1..10]
-          if cur = r['season' + season]
-            if cur['2']?.top ? 0 > highest then highest = cur['2']?.top ? 0
-            if cur['3']?.top ? 0 > highest then highest = cur['3']?.top ? 0
-            if cur['5']?.top ? 0 > highest then highest = cur['5']?.top ? 0
-
-            tmp['s' + season] = ssn_rtngs = {
-              "2v2": cur['2']?.top ? 0
-              "3v3": cur['3']?.top ? 0
-              "5v5": cur['5']?.top ? 0
-            }
-
-            ratings = ratings.concat _.vals(ssn_rtngs)
-
-        return tmp
-      )
-    }
-
-    if !result.class then delete result.class
-
-    result.highest = _.max ratings ? 0
-    
-    ###
-    bulk = JSON.stringify(result,null,2)
-    output = "```#{bulk}```"
-    ###
-
-    # seasons
+    # format ifpro data
     t = new Table "#{result.name} (#{result.highest})"
     t.setBorder('-')
     t.setHeading 'season', '2s', '3s', '5s'
