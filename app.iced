@@ -71,7 +71,7 @@ client.on 'message', (msg) =>
         )
         fields: [{
           name: "#{result.name} - #{conf.SERVER}"
-          value: """```#{result.highest_rating} CR (#{result.highest_bracket} in #{result.highest_season.toUpperCase()})```"""
+          value: """```#{result.highest_rating} CR (#{result.highest_bracket} #{result.highest_season.toUpperCase()})```"""
         },{
           name: "History"
           value: output_history
