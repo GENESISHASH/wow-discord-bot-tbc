@@ -18,29 +18,82 @@ client.on 'ready', =>
 
 ##
 client.on 'message', (msg) =>
-  if msg.content.startsWith(conf.COMMAND + ' ')
+
+  # lookup <name>
+  if msg.content.startsWith('lookup' + ' ')
     player_name = msg.content.substr(conf.COMMAND.length).trim()
 
     # ironforge.pro lookup
     await cinfo.ifpro player_name, defer e,result
     if e
-      return msg.channel.send(e.toString())
+      return msg.channel.send("`" + e.toString() + "`")
+
+    # chad/virgin images
+    image = (do =>
+      if result.highest_rating > 2000
+        return __dirname + '/images/chad-' + _.rand(1,3) + '.png'
+      if result.highest_rating < 1600
+        return __dirname + '/images/virgin-' + _.rand(1,3) + '.png'
+      return null
+    )
 
     # format ifpro data
-    t = new Table "#{result.name} (#{result.highest})"
+    t = new Table()
     t.setBorder('-')
     t.setHeading 'season', '2s', '3s', '5s'
 
     for season, ratings of result.seasonal
       t.addRow season, ratings['2v2'], ratings['3v3'], ratings['5v5']
 
-    output = "\n```#{t.toString()}```"
-    output += """```
-      https://www.tbcarmory.com/character/us/#{conf.SERVER.toLowerCase()}/#{result.name}
-      https://ironforge.pro/armory/player/#{conf.SERVER}/#{result.name}/```
-    """
+    output_history = "\n```#{t.toString()}```"
 
-    return msg.channel.send(output.trim())
+    links = """
+      [tbcarmory.com](https://www.tbcarmory.com/character/us/#{conf.SERVER.toLowerCase()}/#{result.name})
+      [ironforge.pro](https://ironforge.pro/armory/player/#{conf.SERVER}/#{result.name}/)
+    """.split '\n'
+
+    output_links = """#{links.join('\n')}"""
+
+    image_file = null
+
+    if image
+      image_file = new swift.MessageAttachment(image)
+
+    msg_obj = {
+      embed: {
+        color: 12733254
+        timestamp: new Date().toISOString()
+        image: (do =>
+          if image then return {
+            url: "attachment://#{_.base(image)}"
+          }
+          return undefined
+        )
+        fields: [{
+          name: "#{result.name} - #{conf.SERVER}"
+          value: """```#{result.highest_rating} CR (#{result.highest_bracket} in #{result.highest_season.toUpperCase()})```"""
+        },{
+          name: "History"
+          value: output_history
+        },{
+          name: "Links"
+          value: output_links
+        }]
+      }
+      files: (do =>
+        if image then return [image_file]
+        return []
+      )
+    }
+
+    return msg.channel.send(msg_obj)
+
+  # imgtest
+  if msg.content.startsWith('imgtest')
+    return msg.channel.send({
+      content: 'test response'
+      files: [__dirname + '/images/test.png']
+    })
 
 ##
 client.login(token)
