@@ -30,10 +30,10 @@ client.on 'message', (msg) =>
 
     # chad/virgin images
     image = (do =>
-      if result.highest_rating > 2000
-        return __dirname + '/images/chad-' + _.rand(1,3) + '.png'
-      if result.highest_rating < 1600
-        return __dirname + '/images/virgin-' + _.rand(1,3) + '.png'
+      if result.highest_rating >= 2000
+        return __dirname + '/images/chad-' + _.rand(1,2) + '.png'
+      if result.highest_rating <= 1700
+        return __dirname + '/images/virgin-' + _.rand(2,2) + '.png'
       return null
     )
 
