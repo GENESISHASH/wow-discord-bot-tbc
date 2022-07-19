@@ -15,6 +15,7 @@ cinfo = require __dirname + '/lib/character-info'
 ##
 client.on 'ready', =>
   log /connected/, conf.TOKEN
+  client.user.setStatus 'dnd', 'Type lookup <charname> in chat'
 
 ##
 client.on 'message', (msg) =>
