@@ -5,96 +5,37 @@ _ = require('wegweg')({
   shelljs: on
 })
 
-swift = require('swiftly.js')
-client = new swift.Client()
-token = conf.TOKEN
+# find all bots
+files = ls __dirname + '/bots/*.iced'
 
-Table = require 'ascii-table'
-cinfo = require __dirname + '/lib/character-info'
+bots = (_.map files, (x) ->
+  arr = []
 
-##
-client.on 'ready', =>
-  log /connected/, conf.TOKEN
-  client.user.setStatus 'dnd', 'Type lookup <charname> in chat'
+  obj = require(x)
 
-##
-client.on 'message', (msg) =>
+  if _.type(obj) isnt 'array'
+    obj = [obj]
 
-  # lookup <name>
-  if msg.content.startsWith('lookup' + ' ')
-    player_name = msg.content.substr(conf.COMMAND.length).trim()
+  arr = _.map obj, (y) ->
+    if !y.token or !y.client
+      throw new Error 'exports.token and exports.client required'
+      exit 1
+    y.name = _.base(x)
+    y
 
-    # ironforge.pro lookup
-    await cinfo.ifpro player_name, defer e,result
-    if e
-      return msg.channel.send("`" + e.toString() + "`")
+  return arr
+)
 
-    # chad/virgin images
-    image = (do =>
-      if result.highest_rating >= 2000
-        return __dirname + '/images/chad-' + _.rand(1,2) + '.png'
-      if result.highest_rating <= 1700
-        return __dirname + '/images/virgin-' + _.rand(2,2) + '.png'
-      return null
-    )
+for arr in bots
+  _enable = ((bot) =>
+    if !bot.enabled
+      log 'Skipping bot (disabled)', bot.name
+      return
 
-    # format ifpro data
-    t = new Table()
-    t.setBorder('-')
-    t.setHeading 'season', '2s', '3s', '5s'
+    log 'Connecting bot', bot.name
+    bot.client.login(bot.token)
+  )
 
-    for season, ratings of result.seasonal
-      t.addRow season, ratings['2v2'], ratings['3v3'], ratings['5v5']
+  for item in arr
+    do (item) -> _enable(item)
 
-    output_history = "\n```#{t.toString()}```"
-
-    links = """
-      [tbcarmory.com](https://www.tbcarmory.com/character/us/#{conf.SERVER.toLowerCase()}/#{result.name})
-      [ironforge.pro](https://ironforge.pro/armory/player/#{conf.SERVER}/#{result.name}/)
-    """.split '\n'
-
-    output_links = """#{links.join('\n')}"""
-
-    image_file = null
-
-    if image
-      image_file = new swift.MessageAttachment(image)
-
-    msg_obj = {
-      embed: {
-        color: 12733254
-        timestamp: new Date().toISOString()
-        image: (do =>
-          if image then return {
-            url: "attachment://#{_.base(image)}"
-          }
-          return undefined
-        )
-        fields: [{
-          name: "#{result.name} - #{conf.SERVER}"
-          value: """```#{result.highest_rating} CR (#{result.highest_bracket} #{result.highest_season.toUpperCase()})```"""
-        },{
-          name: "History"
-          value: output_history
-        },{
-          name: "Links"
-          value: output_links
-        }]
-      }
-      files: (do =>
-        if image then return [image_file]
-        return []
-      )
-    }
-
-    return msg.channel.send(msg_obj)
-
-  # imgtest
-  if msg.content.startsWith('imgtest')
-    return msg.channel.send({
-      content: 'test response'
-      files: [__dirname + '/images/test.png']
-    })
-
-##
-client.login(token)
