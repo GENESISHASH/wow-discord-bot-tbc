@@ -13,30 +13,57 @@ cinfo = require __dirname + '/../lib/character-info'
 
 ##
 client.on 'ready', =>
-  client.user.setActivity (conf.PREFIX + 'lookup <charname>'), {
+  client.user.setActivity (conf.PREFIX + 'lookup <charname> <server>'), {
     type: 'PLAYING'
   }
 
 ##
 client.on 'message', (msg) =>
 
+  # `help`
+  if msg.content.startsWith(conf.PREFIX + 'help')
+    return msg.channel.send """```
+    commands:
+      .help
+        - displays help menu
+      .lookup <charname> [server]
+          - looks up a character's arena ratings on if.pro
+            - if no server is selected it will attempt to cascade from faerlina -> benediction -> grobbulus
+            - you can use shorthand to refer to the server, i.e. "bene", "faer", or "grob"
+          examples:
+            .lookup lodash faer
+            .lookup soupoftheday grob
+      .cutoffs
+        - displays current arena cutoffs for title rewards
+    ```"""
+
   # `lookup <name>`
   if msg.content.startsWith(start = conf.PREFIX + 'lookup' + ' ')
-    player_name = msg.content.substr(start.length).trim()
+    name = msg.content.substr(start.length).trim()
+
+    if name.includes(' ')
+      [name,server] = name.split(' ')
+
+    opt = {name}
+    if server then opt.server = server
 
     # ironforge.pro lookup
-    await cinfo.ifpro player_name, defer e,result
+    await cinfo.lookup opt, defer e,result
     if e
       return msg.channel.send("`" + e.toString() + "`")
 
+    log result
+
     # chad/virgin images
     image = (do =>
-      if result.highest_rating >= 2000
+      if result.highest_wotlk >= 2000
         return __dirname + '/../images/chad-' + _.rand(1,2) + '.png'
-      if result.highest_rating <= 1700
+      if result.highest_wotlk <= 1700
         return __dirname + '/../images/virgin-' + _.rand(2,2) + '.png'
       return null
     )
+
+    image = null
 
     # format ifpro data
     t = new Table()
@@ -49,8 +76,7 @@ client.on 'message', (msg) =>
     output_history = "\n```#{t.toString()}```"
 
     links = """
-      [tbcarmory.com](https://www.tbcarmory.com/character/us/#{conf.SERVER.toLowerCase()}/#{result.name})
-      [ironforge.pro](https://ironforge.pro/armory/player/#{conf.SERVER}/#{result.name}/)
+      [if.pro](https://ironforge.pro/pvp/player/#{result.server}/#{result.name}/)
     """.split '\n'
 
     output_links = """#{links.join('\n')}"""
@@ -63,21 +89,29 @@ client.on 'message', (msg) =>
     msg_obj = {
       embed: {
         color: 12733254
-        timestamp: new Date().toISOString()
         image: (do =>
           if image then return {
             url: "attachment://#{_.base(image)}"
           }
           return undefined
         )
+        title: "#{result.name} @ #{result.server} (#{result.highest_wotlk ? 0})"
         fields: [{
-          name: "#{result.name} - #{conf.SERVER}"
-          value: """```#{result.highest_rating} CR (#{result.highest_bracket} #{result.highest_season.toUpperCase()})```"""
+          name: "details"
+          value: (do =>
+            return _.vals(result.info).join('/')
+          )
         },{
-          name: "History"
+          name: "wotlk cr"
+          value: result.highest_wotlk ? 0
+        },{
+          name: "tbc cr"
+          value: result.highest_tbc ? 0
+        },{
+          name: "history"
           value: output_history
         },{
-          name: "Links"
+          name: "links"
           value: output_links
         }]
       }
@@ -100,6 +134,6 @@ client.on 'message', (msg) =>
 module.exports = {
   enabled: true
   client: client
-  token: conf.TOKENS.lookup
+  token: conf.TOKENS.main
 }
 

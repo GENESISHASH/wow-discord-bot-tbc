@@ -58,7 +58,7 @@ client_3v3.on 'message', (msg) =>
     t = new Table()
     t.setBorder('-')
 
-    t.setHeading 'team', 'duel', 'glad', 'r1'
+    t.setHeading 'bracket', 'duel', 'glad', 'r1'
 
     q = ['2v2','3v3','5v5']
 
@@ -70,9 +70,9 @@ client_3v3.on 'message', (msg) =>
     output_cutoffs = "\n```#{t.toString()}```"
 
     links = """
-      [ironforge.pro (2v2)](https://ironforge.pro/pvp/leaderboards/US/team/2/)
-      [ironforge.pro (3v3)](https://ironforge.pro/pvp/leaderboards/US/team/3/)
-      [ironforge.pro (5v5)](https://ironforge.pro/pvp/leaderboards/US/team/5/)
+      [if.pro (2v2)](https://ironforge.pro/pvp/leaderboards/US/2/)
+      [if.pro (3v3)](https://ironforge.pro/pvp/leaderboards/US/3/)
+      [if.pro (5v5)](https://ironforge.pro/pvp/leaderboards/US/5/)
     """.split '\n'
 
     links.shift() if conf.DISABLE_2V2
@@ -82,12 +82,12 @@ client_3v3.on 'message', (msg) =>
     msg_obj = {
       embed: {
         color: 5138715
-        timestamp: new Date().toISOString()
+        title: "title cutoffs"
         fields: [{
-          name: "Cutoffs - #{conf.SERVER}"
+          name: "brackets"
           value: output_cutoffs
         },{
-          name: "Links"
+          name: "links"
           value: output_links
         }]
       }

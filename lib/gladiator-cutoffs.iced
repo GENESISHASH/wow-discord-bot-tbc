@@ -10,7 +10,7 @@ axios = require 'axios'
 EventEmitter = (require 'events').EventEmitter
 util = require 'util'
 
-CYCLE_INTERVAL_SECS = _.secs('15 seconds')
+CYCLE_INTERVAL_SECS = _.secs('5 minutes')
 
 module.exports = cutoffs = {
   events: new EventEmitter()
@@ -33,7 +33,7 @@ cutoffs.refresh_bracket = ((bracket="2",cb) ->
   bracket = bracket.substr(0,1)
   bracket_full = "#{bracket}v#{bracket}"
 
-  request_url = "https://ironforge.pro/api/pvp/cutoff/US/" + bracket
+  request_url = "https://ironforge.pro/api/pvp/cutoffs/#{conf.CURRENT_SEASON}/US/#{bracket}/"
 
   axios.request({
     timeout: 30000
@@ -87,4 +87,5 @@ if !module.parent
   await cutoffs.refresh defer e,r
   log /e/, e
   log /r/, r
+  log cutoffs
   exit 0
