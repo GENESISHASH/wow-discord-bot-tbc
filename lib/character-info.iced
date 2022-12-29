@@ -7,18 +7,17 @@ _ = require('wegweg')({
 
 axios = require 'axios'
 
-cinfo = module.exports = {
+top = module.exports = {
   working: {}
 }
 
 # ironforge.pro lookup
-cinfo.ifpro = ((charname,server=null,cb) ->
+top.list = ((opt={},server=null,cb) ->
   _RETURNED = false
 
-  charname = charname.trim().toLowerCase()
-
-  if @working[charname]
-    return cb new Error 'already working on character: ' + charname
+  opt.bracket ?= false
+  opt.class ?= false
+  opt.region ?= 'US'
 
   if !cb and _.type(server) is 'function'
     server = conf.DEFAULT_SERVER
@@ -32,6 +31,11 @@ cinfo.ifpro = ((charname,server=null,cb) ->
 
   server = server.toLowerCase()
 
+  working_hash = _.md5(_.vals(opt).join('') + server)
+
+  if @working[working_hash]
+    return cb new Error 'already working on that job hash: ' + working_hash
+
   request_url = "https://ironforge.pro/api/pvp/player/#{server}/#{charname}"
 
   axios.request({
@@ -42,12 +46,14 @@ cinfo.ifpro = ((charname,server=null,cb) ->
     .catch (e) ->
       if _RETURNED then return false
       _RETURNED = 1
+      delete @working[working_hash]
       return cb e
     .then (r) ->
       try r = r.data
       if !r?.info?.name
         if _RETURNED then return false
         _RETURNED = 1
+        delete @working[working_hash]
         return cb new Error 'character was not found, try again?'
 
       ratings = []
@@ -113,6 +119,7 @@ cinfo.ifpro = ((charname,server=null,cb) ->
             result.highest_bracket = k
             result.highest_season = season
       
+      delete @working[working_hash]
       return cb null, result
 )
 
