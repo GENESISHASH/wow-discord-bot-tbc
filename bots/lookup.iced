@@ -9,11 +9,15 @@ swift = require('swiftly.js')
 client = new swift.Client()
 
 Table = require 'ascii-table'
+
 cinfo = require __dirname + '/../lib/character-info'
+top = require __dirname + '/../lib/top-players'
 
 ##
 client.on 'ready', =>
-  client.user.setActivity (conf.PREFIX + 'lookup <charname> <server>'), {
+  top.cycle()
+
+  client.user.setActivity (conf.PREFIX + 'help'), {
     type: 'PLAYING'
   }
 
@@ -26,15 +30,25 @@ client.on 'message', (msg) =>
     commands:
       .help
         - displays help menu
+
       .lookup <charname> [server]
-          - looks up a character's arena ratings on if.pro
-            - if no server is selected it will attempt to cascade from faerlina -> benediction -> grobbulus
-            - you can use shorthand to refer to the server, i.e. "bene", "faer", or "grob"
-          examples:
-            .lookup lodash faer
-            .lookup soupoftheday grob
+        - looks up a character's arena ratings on if.pro
+          - if no server is selected it will attempt to cascade from faerlina -> benediction -> grobbulus
+          - you can use shorthand to refer to the server, i.e. "bene", "faer", or "grob"
+        examples:
+          .lookup lodash faer
+          .lookup soupoftheday grob
+
       .cutoffs
         - displays current arena cutoffs for title rewards
+
+      .top <query>
+        - looks up the top rated players given an open-ended query
+        examples:
+          .top 10 locks and rogues on bene
+          .top 3 horde mages
+          .top rank1 or glad locks on ally bene
+      
     ```"""
 
   # `lookup <name>`
@@ -56,7 +70,7 @@ client.on 'message', (msg) =>
 
     # chad/virgin images
     image = (do =>
-      if result.highest_wotlk >= 2000
+      if result.highest_wotlk >= 2400
         return __dirname + '/../images/chad-' + _.rand(1,2) + '.png'
       if result.highest_wotlk <= 1700
         return __dirname + '/../images/virgin-' + _.rand(2,2) + '.png'
@@ -129,6 +143,54 @@ client.on 'message', (msg) =>
       content: 'test response'
       files: [__dirname + '/../images/test.png']
     })
+
+  # `top <query>`
+  if msg.content.startsWith(start = conf.PREFIX + 'top' + ' ')
+    query = msg.content.substr(start.length).trim()
+
+    # ironforge.pro lookup
+    try
+      query_opt = top.parse_query(query)
+    catch e
+      return msg.channel.send("`" + e.toString() + "`")
+
+    await top.query query_opt, defer e,result
+    if e
+      return msg.channel.send("`" + e.toString() + "`")
+
+    log result
+
+    t = new Table()
+    #t.setBorder('-')
+    t.setHeading 'name', 'cr', 'class', 'server', 'faction'
+
+    for x in result.items
+      t.addRow x.name, x.rating, x.class, x.server, x.faction
+
+    output = "\n```\n#{t.toString()}```"
+
+    log output
+
+    msg_obj = {
+      embed: {
+        color: 5138715
+        title: result.query.options.input
+        fields: [{
+          name: "bracket"
+          value: result.query.options.bracket
+        }]
+      }
+      ###
+      files: (do =>
+        if image then return [image_file]
+        return []
+      )
+      ###
+    }
+
+    log output
+
+    return msg.channel.send(output)
 
 ##
 module.exports = {
