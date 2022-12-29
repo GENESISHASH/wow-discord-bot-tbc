@@ -45,7 +45,6 @@ client.on 'message', (msg) =>
           .top 10 locks and rogues on bene
           .top 3 horde mages
           .top rank1 or glad locks on ally bene
-      
     ```"""
 
   # `lookup <name>`
