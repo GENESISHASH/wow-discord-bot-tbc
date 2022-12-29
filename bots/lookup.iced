@@ -30,18 +30,15 @@ client.on 'message', (msg) =>
     commands:
       .help
         - displays help menu
-
       .lookup <charname> [server]
         - looks up a character's arena ratings on if.pro
-          - if no server is selected it will attempt to cascade from faerlina -> benediction -> grobbulus
-          - you can use shorthand to refer to the server, i.e. "bene", "faer", or "grob"
+        - you can use shorthand to refer to the server
+          - i.e. "bene", "faer", or "grob"
         examples:
           .lookup lodash faer
           .lookup soupoftheday grob
-
       .cutoffs
         - displays current arena cutoffs for title rewards
-
       .top <query>
         - looks up the top rated players given an open-ended query
         examples:
