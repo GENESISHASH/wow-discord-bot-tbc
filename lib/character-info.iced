@@ -7,17 +7,18 @@ _ = require('wegweg')({
 
 axios = require 'axios'
 
-top = module.exports = {
+cinfo = module.exports = {
   working: {}
 }
 
 # ironforge.pro lookup
-top.list = ((opt={},server=null,cb) ->
+cinfo.ifpro = ((charname,server=null,cb) ->
   _RETURNED = false
 
-  opt.bracket ?= false
-  opt.class ?= false
-  opt.region ?= 'US'
+  charname = charname.trim().toLowerCase()
+
+  if @working[charname]
+    return cb new Error 'already working on character: ' + charname
 
   if !cb and _.type(server) is 'function'
     server = conf.DEFAULT_SERVER
@@ -29,12 +30,9 @@ top.list = ((opt={},server=null,cb) ->
   if server !in conf.SERVER_CASCADE
     return cb new Error 'invalid server provided, valid servers: ' + conf.SERVER_CASCADE.join(', ').toLowerCase()
 
+  @working[charname] = _.time()
+
   server = server.toLowerCase()
-
-  working_hash = _.md5(_.vals(opt).join('') + server)
-
-  if @working[working_hash]
-    return cb new Error 'already working on that job hash: ' + working_hash
 
   request_url = "https://ironforge.pro/api/pvp/player/#{server}/#{charname}"
 
@@ -43,17 +41,17 @@ top.list = ((opt={},server=null,cb) ->
     url: request_url
     method: 'get'
   })
-    .catch (e) ->
+    .catch (e) =>
       if _RETURNED then return false
       _RETURNED = 1
-      delete @working[working_hash]
+      try delete @working[charname]
       return cb e
-    .then (r) ->
+    .then (r) =>
       try r = r.data
       if !r?.info?.name
         if _RETURNED then return false
         _RETURNED = 1
-        delete @working[working_hash]
+        try delete @working[charname]
         return cb new Error 'character was not found, try again?'
 
       ratings = []
@@ -119,7 +117,8 @@ top.list = ((opt={},server=null,cb) ->
             result.highest_bracket = k
             result.highest_season = season
       
-      delete @working[working_hash]
+      try delete @working[charname]
+
       return cb null, result
 )
 

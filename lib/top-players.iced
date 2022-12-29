@@ -7,85 +7,145 @@ _ = require('wegweg')({
 
 axios = require 'axios'
 
-EventEmitter = (require 'events').EventEmitter
-util = require 'util'
-
-CYCLE_INTERVAL_SECS = _.secs('5 minutes')
-
-module.exports = cutoffs = {
-  events: new EventEmitter()
-  rank1:
-    "2v2": 0
-    "3v3": 0
-    "5v5": 0
-  gladiator:
-    "2v2": 0
-    "3v3": 0
-    "5v5": 0
-  duelist:
-    "2v2": 0
-    "3v3": 0
-    "5v5": 0
+top = module.exports = {
+  working: {}
 }
 
-cutoffs.refresh_bracket = ((bracket="2",cb) ->
-  try bracket = bracket.toString()
-  bracket = bracket.substr(0,1)
-  bracket_full = "#{bracket}v#{bracket}"
+# ironforge.pro lookup
+top.list = ((opt={},server=null,cb) ->
+  _RETURNED = false
 
-  request_url = "https://ironforge.pro/api/pvp/cutoffs/#{conf.CURRENT_SEASON}/US/#{bracket}/"
+  opt.bracket ?= false
+  opt.class ?= false
+  opt.region ?= 'US'
+
+  if !cb and _.type(server) is 'function'
+    server = conf.DEFAULT_SERVER
+
+  if server !in conf.SERVER_CASCADE
+    if found = conf.SERVER_SHORTHAND[server]
+      server = found
+  
+  if server !in conf.SERVER_CASCADE
+    return cb new Error 'invalid server provided, valid servers: ' + conf.SERVER_CASCADE.join(', ').toLowerCase()
+
+  server = server.toLowerCase()
+
+  working_hash = _.md5(_.vals(opt).join('') + server)
+
+  if @working[working_hash]
+    return cb new Error 'already working on that job hash: ' + working_hash
+
+  request_url = "https://ironforge.pro/api/pvp/player/#{server}/#{charname}"
 
   axios.request({
-    timeout: 30000
+    timeout: 20000
     url: request_url
     method: 'get'
   })
     .catch (e) ->
+      if _RETURNED then return false
+      _RETURNED = 1
+      delete @working[working_hash]
       return cb e
-    .then (r) =>
-      data = r.data?.cutoff
+    .then (r) ->
+      try r = r.data
+      if !r?.info?.name
+        if _RETURNED then return false
+        _RETURNED = 1
+        delete @working[working_hash]
+        return cb new Error 'character was not found, try again?'
 
-      if data?.length > 1 and data[0]?[0] > 1
-        cutoffs.rank1[bracket_full] = data[0][0]
-        cutoffs.gladiator[bracket_full] = data[1][0]
-        cutoffs.duelist[bracket_full] = data[2][0]
+      ratings = []
+      tbc_ratings = []
 
-      @events.emit 'bracket-update', {
-        bracket: bracket
-        bracket_full: bracket_full
+      result = {
+        name: r.info.name
+        info: r.info
+        server: server
+        seasonal: (do =>
+          tmp = {}
+          for season in [1..10]
+            if cur = r['season' + season]
+              if cur['2']?.top ? 0 > highest then highest = cur['2']?.top ? 0
+              if cur['3']?.top ? 0 > highest then highest = cur['3']?.top ? 0
+              if cur['5']?.top ? 0 > highest then highest = cur['5']?.top ? 0
+
+              tmp['s' + season] = ssn_rtngs = {
+                "2v2": cur['2']?.top ? 0
+                "3v3": cur['3']?.top ? 0
+                "5v5": cur['5']?.top ? 0
+              }
+
+              if season > 4
+                ratings = ratings.concat _.vals(ssn_rtngs)
+              else
+                tbc_ratings = tbc_ratings.concat _.vals(ssn_rtngs)
+
+          return tmp
+        )
       }
 
-      return cb null, data
+      if _RETURNED then return false
+
+      log /result/, result
+
+      try delete result.info.name
+      try delete result.info.region
+      try delete result.info.server
+
+      for k,v of result.info
+        if !v then delete result.info[k]
+        try result.info[k] = v.toLowerCase()
+
+      if !result.class then delete result.class
+
+      result.highest_wotlk = _.max ratings ? 0
+      if !result.highest_wotlk then result.highest_wotlk = 0
+
+      result.highest_tbc = _.max tbc_ratings ? 0
+      if !result.highest_tbc then result.highest_tbc = 0
+
+      result.highest_rating = _h = 0
+      result.highest_bracket = null
+      result.highest_season = null
+
+      for season,obj of result.seasonal
+        continue if season < 5
+        for k,v of obj
+          if v > _h
+            _h = v
+            result.highest_rating = v
+            result.highest_bracket = k
+            result.highest_season = season
+      
+      delete @working[working_hash]
+      return cb null, result
 )
 
-cutoffs.refresh = (cb=null) ->
-  if !cb then cb = -> 1
+# wrapper to lookup on multiple servers
+cinfo.lookup = ((opt,cb) ->
+  required = [
+    'name'
+  ]
 
-  if !conf.DISABLE_2V2
-    await
-      cutoffs.refresh_bracket 2, defer e
-      cutoffs.refresh_bracket 3, defer e
-      cutoffs.refresh_bracket 5, defer e
-  else
-    await
-      cutoffs.refresh_bracket 3, defer e
-      cutoffs.refresh_bracket 5, defer e
+  if !opt.name then return cb new error 'no character name provided'
+  if opt.server then opt.server = [opt.server]
+  if !opt.server then opt.server = conf.SERVER_CASCADE
 
-  if e then return cb e
+  for server in opt.server
+    await cinfo.ifpro opt.name, server, defer e,result
+    if e then continue
+    if result then break
 
-  return cb null, true
+  if !result
+    return cb new Error 'character not found (tried servers: ' + opt.server.join(',').toLowerCase() + ')'
 
-cutoffs.cycle = (->
-  return false if @_cycling
-  @_cycling = 1
-
-  cutoffs.refresh ->
-    setInterval cutoffs.refresh, (CYCLE_INTERVAL_SECS * 1000)
+  return cb null, result
 )
 
 if !module.parent
-  await cutoffs.refresh defer e,r
+  await cinfo.lookup {name:'lodash'}, defer e,r
   log /e/, e
   log /r/, r
-  log cutoffs
   exit 0
